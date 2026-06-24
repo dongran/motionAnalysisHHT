@@ -15,43 +15,137 @@ The Hilbert-Huang Transform (HHT) is a time-frequency analysis method particular
 ## Key Features
 
 - **BVH File Handling**: Read and write BVH motion capture files
+- **Two Rotation Modes**: Decompose motion in Euler-angle space or quaternion space
 - **Multivariate Empirical Mode Decomposition (MEMD)**: Decompose motion signals into Intrinsic Mode Functions (IMFs)
 - **Hilbert Spectral Analysis**: Extract instantaneous frequency and amplitude information
 - **Visualization**: Generate Hilbert spectral plots for selected joints
-- **Motion Decomposition**: Output individual IMF components as BVH files for visualization
+- **Motion Decomposition**: Export individual IMF components as BVH files for side-by-side viewing
 
 ## Dependencies
 
+- Python 3.10+ (3.11 recommended)
 - NumPy
 - Matplotlib
+- SciPy (quaternion conversion via `scipy.spatial.transform.Rotation`)
 - Custom modules:
   - `MEMD_all.py`: Multivariate EMD implementation
   - `ht.py`: Hilbert Transform utilities
+  - `bvh.py`: BVH I/O and rotation conversion helpers
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Conda environment (recommended)
+
+Use Miniconda/Anaconda instead of the system Python (e.g. Python 2.7 on some Windows setups):
+
+```bash
+conda create -n motion-hht python=3.11 -y
+conda activate motion-hht
+pip install -r requirements.txt
+```
 
 ## Usage
 
-1. Place your BVH files in the `data` directory
-2. Edit the file path in `motionAnalysisHHT.py` to point to your BVH file
-3. Run the script:
+The main entry point is `motionAnalysisHHT.py`. Sample BVH files are provided under `data/` (e.g. `data/jump/13_32.bvh`, `data/golf/cmuGolf.bvh`).
+
+### Euler-angle mode (default)
+
+Decompose BVH Euler rotation channels directly. This matches the original pipeline.
 
 ```bash
-python motionAnalysisHHT.py
+python motionAnalysisHHT.py --rotation-mode euler
 ```
 
-4. The script will generate:
-   - Hilbert spectrum visualizations in the `visualization` directory
-   - Decomposed motion components in the `decomposition` directory
+### Quaternion mode
+
+Convert each joint's Euler angles to quaternions (via SciPy), run MEMD in quaternion space, then convert IMF outputs back to Euler angles for BVH export.
+
+```bash
+python motionAnalysisHHT.py --rotation-mode quat
+```
+
+### Custom input and output
+
+```bash
+python motionAnalysisHHT.py --input ./data/golf/cmuGolf.bvh --rotation-mode quat
+python motionAnalysisHHT.py --input ./data/jump/13_32.bvh --rotation-mode euler --output-dir ./my_run
+```
+
+### Command-line options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--input` | `./data/jump/13_32.bvh` | Path to input BVH file |
+| `--rotation-mode` | `euler` | `euler` or `quat` |
+| `--output-dir` | mode-specific (see below) | Root directory for outputs |
+
+### Output directories
+
+| Mode | Spectra (PNG) | Decomposed BVH |
+|------|---------------|----------------|
+| `euler` | `visualization/` | `decomposition/` |
+| `quat` | `visualization_quat/` | `decomposition_quat/` |
+
+If `--output-dir` is set (e.g. `./my_run`), files are written to `my_run/visualization/` and `my_run/decomposition/` regardless of mode.
+
+Each run produces:
+
+- Hilbert spectrum plots for selected joints (`joint_<channel>_spectrum.png`, or `joint_<channel>_spectrum_quat.png` in quaternion mode)
+- BVH files: `IMF1.bvh` … `IMF<n-1>.bvh`, `Trend.bvh`, `original.bvh`
+
+## Rotation Modes
+
+### Euler mode
+
+- MEMD operates on the raw BVH channel layout (positions + Euler angles).
+- Root rotation channels are unwrapped before decomposition (`errc` on channels 3–6).
+- Suitable for direct comparison with the original published workflow.
+
+### Quaternion mode
+
+- Each rotation triplet is converted to four quaternion components (`x, y, z, w`) using the Euler order declared in the BVH hierarchy (e.g. `zxy` for CMU golf data, `zyx` for some jump mocap files).
+- Quaternion sign is kept continuous across frames before MEMD.
+- Root translation channels are included in MEMD unchanged.
+- IMF results are normalized and converted back to Euler angles before writing BVH files.
+
+Both modes use the same MEMD + Hilbert visualization pipeline; only the working representation for rotation channels differs.
 
 ## BVH Joint Selection
 
-The script analyzes specific joints by default:
-- Joint 27: RightLeg
-- Joint 12: LeftLeg
-- Joint 45: Neck
-- Joint 78: RightArm
-- Joint 57: LeftArm
+The script analyzes specific joints by default (first rotation channel index in the Euler BVH layout):
 
-You can modify the joint selection in the script by editing the `joints` array.
+| Channel index | Joint (example skeleton) |
+|---------------|-------------------------|
+| 27 | RightLeg |
+| 12 | LeftLeg |
+| 45 | Neck |
+| 78 | RightArm |
+| 57 | LeftArm |
+
+Edit the `JOINTS` list in `motionAnalysisHHT.py` to change which joints are plotted.
+
+## Hilbert Spectrum Visualization
+
+For each selected joint, instantaneous frequency and amplitude are computed per IMF layer, then aggregated across rotation channels:
+
+- **Euler mode**: 3 channels — arithmetic mean of frequency; RMS of amplitude (√(mean of squared amplitudes)).
+- **Quaternion mode**: 4 channels — same aggregation over `x, y, z, w`.
+
+This is a practical visualization heuristic for comparing Euler vs quaternion MEMD pipelines. It is not a strict SO(3) spectral measure.
+
+## BVH Output Layout (viewer offsets)
+
+Exported IMF BVH files are shifted along the root **X position** so multiple clips can be viewed side by side in a BVH player:
+
+- `IMF1` … `IMF7`: `+150`, `+300`, … along X (`VISUALIZATION_SPACING` in `motionAnalysisHHT.py`)
+- `original.bvh`: `-150` (opposite `IMF1`)
+- `Trend.bvh`: no offset
+
+These offsets affect display position only, not joint rotations. To compare `original.bvh` numerically with the input file, add `150` to the root X channel.
 
 ## Example Output
 
@@ -95,4 +189,4 @@ If you use this code in your research, please cite:
 
 ## Contact
 
-For questions or collaboration opportunities, please open an issue in this repository. 
+For questions or collaboration opportunities, please open an issue in this repository.

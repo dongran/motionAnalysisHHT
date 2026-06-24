@@ -304,7 +304,7 @@ def envelope_mean(m,t,seq,ndir,N,N_dim): #new
         # Only done if number of extrema of the projected signal exceed 3
         if mode:
             
-            #scipy.interpolate.lagrangeによるラグランジュ補間実行
+            # Lagrange interpolation via scipy.interpolate.lagrange (commented out)
             # env_min = np.zeros((N, N_dim))
             # for i in range(N_dim):
             #     f_Lag=lagrange(tmin,zmin[:,i])
@@ -698,7 +698,7 @@ def avgF(IMF,dt):
     for i in range (joints):
         freq, amp = hs.FAhilbert(IMF[:,i,:], dt)
         for j in range (num):
-            tmp[0,j]=np.sum(amp[:n,j] * freq[:,j]/np.sum(amp[:n,j])) #重み付き平均周波数
+            tmp[0,j]=np.sum(amp[:n,j] * freq[:,j]/np.sum(amp[:n,j])) # amplitude-weighted mean frequency
         # if str(tmp[0,0]) != 'nan':
         #     avgf = np.r_[avgf,tmp]
              
@@ -790,17 +790,17 @@ def hhtplot(inf,amp):
     inf = inf.T
     amp = amp.T
     
-    #データ交換、振幅の強いデータが上になるようにする。
+    # Swap rows so stronger-amplitude components appear on top.
     
     for i in range(n):
         for j in range(m):
             for k in range(m-j):
                 if(amp[k,i]>amp[k+1,i]):
-                    #振幅交換
+                    # swap amplitude
                     tmp1=amp[k,i]
                     amp[k,i]= amp[k+1,i]
                     amp[k+1,i] = tmp1
-                    #周波数交換
+                    # swap frequency
                     tmp2=inf[k,i]
                     inf[k,i]= inf[k+1,i]
                     inf[k+1,i] = tmp2
@@ -819,17 +819,17 @@ def hhtplot(inf,amp):
 #     # inf = inf.T
 #     # amp = amp.T
     
-#     #データ交換、振幅の強いデータが上になるようにする。
+#     # Swap rows so stronger-amplitude components appear on top.
     
 #     for i in range(n):
 #         for j in range(m):
 #             for k in range(m-j):
 #                 if(amp[i,k]>amp[i,k+1]):
-#                     #振幅交換
+#                     # swap amplitude
 #                     tmp1=amp[i,k]
 #                     amp[i,k]= amp[i,k+1]
 #                     amp[i,k+1] = tmp1
-#                     #周波数交換
+#                     # swap frequency
 #                     tmp2=inf[i,k]
 #                     inf[i,k]= inf[i,k+1]
 #                     inf[i,k+1] = tmp2
